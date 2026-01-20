@@ -1,0 +1,10 @@
+services:
+  tg-signal-binance:
+    build: .
+    container_name: tg-signal-binance
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
+    command: ["python", "-m", "app.main"]
