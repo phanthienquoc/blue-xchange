@@ -109,6 +109,33 @@ async def notify_chats(message: str):
         except Exception as e:
             log.error(f"Failed to send notification to {chat_id}: {e}")
 
+async def notify_startup_targets():
+    """Notify all routing target chats that the app has started."""
+    raw_targets = [
+        getattr(settings, "KNOWLEDGE_TARGET_ID", None),
+        getattr(settings, "TRADING_TARGET_ID", None),
+        getattr(settings, "GENERAL_FORWARD_ID", None),
+    ]
+    startup_message = (
+        "✅ App started\n"
+        f"• Time: `{datetime.now().strftime('%H:%M:%S %d/%m/%Y')}`"
+    )
+
+    seen_targets = set()
+    for target in raw_targets:
+        if not target:
+            continue
+        target_str = str(target).strip()
+        if not target_str or target_str in seen_targets:
+            continue
+        seen_targets.add(target_str)
+        try:
+            target_id = int(target_str) if target_str.replace("-", "").isdigit() else target_str
+            await client.send_message(target_id, startup_message)
+            log.info(f"Startup notification sent to {target_str}")
+        except Exception as e:
+            log.error(f"Failed to send startup notification to {target_str}: {e}")
+
 @client.on(events.NewMessage())
 async def on_new_message(event):
     """Process trading signals from configured listen chat for notification and execution"""
@@ -242,6 +269,7 @@ async def run_telethon():
     await client.start()
     me = await client.get_me()
     log.info(f"Telethon signed in as: {me.first_name} (@{me.username})")
+    await notify_startup_targets()
     log.info("Listening for signals from ALL joined chats...")
         
     await client.run_until_disconnected()
