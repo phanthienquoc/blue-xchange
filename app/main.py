@@ -1,6 +1,5 @@
 import asyncio
-import json
-from datetime import datetime, date
+from datetime import datetime
 from telethon import TelegramClient, events
 
 from app.config import load_settings
@@ -31,48 +30,67 @@ def calc_qty(usdt: float, leverage: int, entry_price: float) -> float:
 
 @client.on(events.NewMessage())
 async def forward_all_messages(event):
-    """Forward ALL incoming messages as JSON if TG_FORWARD_CHAT_ID is configured"""
-    if not settings.TG_FORWARD_CHAT_ID:
-        return
-    
-    text = getattr(event.message, 'message', '')
+    """Route all incoming messages to trading/knowledge/general destinations."""
+    k_target = getattr(settings, "KNOWLEDGE_TARGET_ID", None)
+    t_target = getattr(settings, "TRADING_TARGET_ID", None)
+    gen_target = getattr(settings, "GENERAL_FORWARD_ID", None)
+
     try:
-        chat = await event.get_chat()
-        chat_info = f"{chat.title if hasattr(chat, 'title') else chat.first_name} (ID: {event.chat_id})"
-        log.info(f"📩 Message from {chat_info} | Text: {text[:50]}... | Forwarding to {settings.TG_FORWARD_CHAT_ID}")
-        
-        msg_dict = event.message.to_dict()
-        def json_serial(obj):
-            if isinstance(obj, (datetime, date)):
-                return obj.isoformat()
-            if isinstance(obj, bytes):
-                return obj.hex()
-            return str(obj)
+        text = event.message.text or ""
+        sig = parse_signal(text)
 
-        msg_json = json.dumps(msg_dict, default=json_serial, indent=2)
-        
-        forward_id = settings.TG_FORWARD_CHAT_ID
-        if forward_id.isdigit() or (forward_id.startswith('-') and forward_id[1:].isdigit()):
-            forward_id = int(forward_id)
-        
-        # 1. Native Telegram Forward (preserves media, formatting, etc.)
-        try:
-            await event.message.forward_to(forward_id)
-            log.info(f"➡️ Native forward successful")
-        except Exception as e:
-            log.error(f"❌ Native forward failed: {e}")
-
-        # 2. JSON Dump (as requested in previous feature)
-        if len(msg_json) > 4000:
-            from io import BytesIO
-            f = BytesIO(msg_json.encode('utf-8'))
-            f.name = f"msg_{event.message.id}.json"
-            await client.send_file(forward_id, f, caption=f"From {chat_info}")
+        knowledge_ids = set(getattr(settings, "KNOWLEDGE_SOURCE_IDS", []) or [])
+        knowledge_keywords = getattr(settings, "KNOWLEDGE_KEYWORDS", []) or []
+        lower_text = text.lower()
+        is_knowledge_keyword = any(kw in lower_text for kw in knowledge_keywords)
+        if sig:
+            target_id = t_target
+            tag = "🚀 **TRADING SIGNAL**"
+        elif event.chat_id in knowledge_ids or is_knowledge_keyword:
+            target_id = k_target
+            tag = "📚 **KNOWLEDGE SOURCE**"
         else:
-            await client.send_message(forward_id, f"**From {chat_info}:**\n```json\n{msg_json}\n```")
-        log.info(f"✅ JSON dump completed")
+            target_id = gen_target
+            tag = "📥 **GENERAL ARCHIVE**"
+
+        if not target_id:
+            return
+
+        chat = await event.get_chat()
+        chat_title = (
+            chat.title
+            if hasattr(chat, "title") and chat.title
+            else (getattr(chat, "first_name", None) or "Private Chat")
+        )
+
+        header = (
+            f"{tag}\n"
+            f"• **Nguồn:** `{chat_title}`\n"
+            f"• **Lúc:** `{datetime.now().strftime('%H:%M:%S %d/%m/%Y')}`\n"
+            "---"
+        )
+        full_content = f"{header}\n\n{text}".strip()
+
+        to_id = int(str(target_id).strip())
+        entities = event.message.entities or None
+
+        if event.message.media:
+            await client.send_file(
+                to_id,
+                event.message.media,
+                caption=full_content,
+                formatting_entities=entities,
+            )
+        else:
+            await client.send_message(
+                to_id,
+                full_content,
+                formatting_entities=entities,
+            )
+
+        log.info(f"✅ Routed to {target_id} from {chat_title}")
     except Exception as e:
-        log.error(f"❌ Failed to forward message: {e}")
+        log.error(f"❌ Error in forward_all_messages: {e}")
 
 async def notify_chats(message: str):
     """Send message to TG_ADMIN_CHAT_ID and TG_ORDER_CHAT_ID"""

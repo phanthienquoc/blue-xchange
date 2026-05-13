@@ -13,6 +13,11 @@ class Settings(BaseModel):
     TG_ADMIN_CHAT_ID: str
     TG_ORDER_CHAT_ID: Optional[str] = None
     TG_FORWARD_CHAT_ID: Optional[str] = None
+    KNOWLEDGE_TARGET_ID: Optional[str] = None
+    TRADING_TARGET_ID: Optional[str] = None
+    GENERAL_FORWARD_ID: Optional[str] = None
+    KNOWLEDGE_SOURCE_IDS: list[int] = []
+    KNOWLEDGE_KEYWORDS: list[str] = []
 
     BINANCE_API_KEY: str
     BINANCE_API_SECRET: str
@@ -32,6 +37,28 @@ class Settings(BaseModel):
 
 def load_settings() -> Settings:
     symbol_map_raw = os.getenv("SYMBOL_MAP", "{}")
+    knowledge_sources_raw = os.getenv("KNOWLEDGE_SOURCE_IDS", "[]")
+    knowledge_keywords_raw = os.getenv("KNOWLEDGE_KEYWORDS", "")
+
+    knowledge_source_ids: list[int] = []
+    try:
+        if knowledge_sources_raw.strip().startswith("["):
+            parsed_ids = json.loads(knowledge_sources_raw)
+            knowledge_source_ids = [int(str(i).strip()) for i in parsed_ids]
+        else:
+            knowledge_source_ids = [
+                int(i.strip())
+                for i in knowledge_sources_raw.split(",")
+                if i.strip()
+            ]
+    except Exception:
+        knowledge_source_ids = []
+
+    knowledge_keywords = [
+        kw.strip().lower()
+        for kw in knowledge_keywords_raw.split(",")
+        if kw.strip()
+    ]
 
     return Settings(
         TG_API_ID=int(os.getenv("TG_API_ID", "0")),
@@ -43,6 +70,11 @@ def load_settings() -> Settings:
         TG_ADMIN_CHAT_ID=str(os.getenv("TG_ADMIN_CHAT_ID", "")),
         TG_ORDER_CHAT_ID=os.getenv("TG_ORDER_CHAT_ID") or None,
         TG_FORWARD_CHAT_ID=os.getenv("TG_FORWARD_CHAT_ID") or None,
+        KNOWLEDGE_TARGET_ID=os.getenv("KNOWLEDGE_TARGET_ID") or None,
+        TRADING_TARGET_ID=os.getenv("TRADING_TARGET_ID") or None,
+        GENERAL_FORWARD_ID=os.getenv("GENERAL_FORWARD_ID") or None,
+        KNOWLEDGE_SOURCE_IDS=knowledge_source_ids,
+        KNOWLEDGE_KEYWORDS=knowledge_keywords,
 
         BINANCE_API_KEY=os.getenv("BINANCE_API_KEY", ""),
         BINANCE_API_SECRET=os.getenv("BINANCE_API_SECRET", ""),
