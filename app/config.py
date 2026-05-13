@@ -8,6 +8,7 @@ class Settings(BaseModel):
     TG_API_HASH: str
     TG_SESSION: str
     TG_LISTEN_CHAT_ID: str
+    TRADING_SOURCE_ID: Optional[str] = None
 
     TG_BOT_TOKEN: str
     TG_ADMIN_CHAT_ID: str
@@ -65,6 +66,7 @@ def load_settings() -> Settings:
         TG_API_HASH=os.getenv("TG_API_HASH", ""),
         TG_SESSION=os.getenv("TG_SESSION", "/data/tg.session"),
         TG_LISTEN_CHAT_ID=os.getenv("TG_LISTEN_CHAT_ID", ""),
+        TRADING_SOURCE_ID=os.getenv("TRADING_SOURCE_ID") or None,
 
         TG_BOT_TOKEN=os.getenv("TG_BOT_TOKEN", ""),
         TG_ADMIN_CHAT_ID=str(os.getenv("TG_ADMIN_CHAT_ID", "")),

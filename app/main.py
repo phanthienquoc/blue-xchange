@@ -34,6 +34,7 @@ async def forward_all_messages(event):
     k_target = getattr(settings, "KNOWLEDGE_TARGET_ID", None)
     t_target = getattr(settings, "TRADING_TARGET_ID", None)
     gen_target = getattr(settings, "GENERAL_FORWARD_ID", None)
+    trading_source_id = getattr(settings, "TRADING_SOURCE_ID", None)
 
     try:
         text = event.message.text or ""
@@ -43,7 +44,16 @@ async def forward_all_messages(event):
         knowledge_keywords = getattr(settings, "KNOWLEDGE_KEYWORDS", []) or []
         lower_text = text.lower()
         is_knowledge_keyword = any(kw in lower_text for kw in knowledge_keywords)
-        if sig:
+        is_trading_source = False
+        if trading_source_id:
+            source_str = str(trading_source_id).strip()
+            if source_str.replace("-", "").isdigit():
+                is_trading_source = event.chat_id == int(source_str)
+
+        if is_trading_source:
+            target_id = t_target
+            tag = "📈 **TRADING SOURCE**"
+        elif sig:
             target_id = t_target
             tag = "🚀 **TRADING SIGNAL**"
         elif event.chat_id in knowledge_ids or is_knowledge_keyword:
@@ -143,8 +153,8 @@ async def on_new_message(event):
 
     allowed_chat_ids = set()
 
-    # 1. Configured Listen ID (or default)
-    listen_id = getattr(settings, "TG_LISTEN_CHAT_ID", None)
+    # 1. Configured trading source ID (fallback to listen ID, then default)
+    listen_id = getattr(settings, "TRADING_SOURCE_ID", None) or getattr(settings, "TG_LISTEN_CHAT_ID", None)
     if listen_id in (None, "", 0, ""):
         listen_id = DEFAULT_LISTEN_CHAT_ID
     
