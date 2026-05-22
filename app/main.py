@@ -79,7 +79,9 @@ async def forward_all_messages(event):
             f"• **Lúc:** `{datetime.now().strftime('%H:%M:%S %d/%m/%Y')}`\n"
             "---"
         )
-        full_content = f"{header}\n\n{text}".strip()
+        # full_content = f"{header}\n\n{text}".strip()
+        full_content = f"{text}".strip()
+
 
         to_id = int(str(target_id).strip())
         entities = event.message.entities or None
